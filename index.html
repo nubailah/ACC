@@ -32,7 +32,7 @@ button:disabled { opacity:0.6; cursor:not-allowed; }
 <p id="result"></p>
 
 <script>
-const WEBAPP_URL="https://script.google.com/macros/s/AKfycbygaucS0ws5SpEx3jRgcEyKP7duJSK60bF4g8NvoKkvx5jS_Ktd3rnK6gfNnPfJIq1XXw/exec";
+const WEBAPP_URL="https://script.google.com/macros/s/AKfycbyelenriTEWZ3McqrUdFQvgifaA9vEMTXuZW1wZGBSi22nMwhj7gQ04CF41G_v7sa8o/exec";
 let questionData=[];
 
 // Check submission status
@@ -141,18 +141,20 @@ function autoCheckLoad(){
     const id = idInput.value.trim();
     if(!id){ loadBtn.disabled=true; resultMsg.innerText=""; return; }
 
-    const active = await isExamActive();
-    const submitted = await checkSubmission(id);
-    if(!active){ loadBtn.disabled=true; resultMsg.innerText="Exam not active now."; return; }
-    if(submitted){ loadBtn.disabled=true; resultMsg.innerText="You have already submitted."; return; }
-    loadBtn.disabled=false; resultMsg.innerText="";
+    const [active, submitted] = await Promise.all([isExamActive(), checkSubmission(id)]);
+
+    if(submitted){ loadBtn.disabled=true; document.getElementById("submitBtn").disabled=true; resultMsg.innerText="This ID has already submitted. All inputs disabled."; disableAllInputs(); return; }
+    if(!active){ loadBtn.disabled=true; document.getElementById("submitBtn").disabled=true; resultMsg.innerText="Exam not active now."; return; }
+
+    loadBtn.disabled=false;
+    document.getElementById("submitBtn").disabled=false;
+    resultMsg.innerText="";
   }
 
   nameInput.addEventListener("input", checkEnable);
   idInput.addEventListener("input", checkEnable);
-
-  setInterval(checkEnable, 10000); // auto check every 10 sec
-  checkEnable(); // initial
+  setInterval(checkEnable,10000);
+  checkEnable();
 }
 
 // On load
