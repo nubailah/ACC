@@ -24,7 +24,7 @@ button:disabled { opacity:0.6; cursor:not-allowed; }
 <div class="student-info">
 <input type="text" id="studentName" placeholder="Your Name">
 <input type="text" id="studentID" placeholder="Student ID">
-<button id="loadQuestionsBtn" onclick="loadQuestions()">Load Questions</button>
+<button id="loadQuestionsBtn" onclick="loadQuestions()" disabled>Load Questions</button>
 <button id="submitBtn" onclick="submitAnswers()" disabled>Submit Answers</button>
 </div>
 
@@ -46,7 +46,7 @@ async function loadPdfLink(){
   }catch(err){document.getElementById("pdfLink").innerText="Failed to load PDF link: "+err;}
 }
 
-// Check ID submission on page load or on input change
+// Check ID submission
 async function checkSubmission(id, name){
   if(!id) return false;
   try{
@@ -91,7 +91,7 @@ async function loadQuestions(){
   }catch(err){document.getElementById("questions").innerText="Failed to load questions: "+err;}
 }
 
-// Disable all inputs and buttons
+// Disable all inputs
 function disableAllInputs(){
   document.getElementById("studentName").disabled = true;
   document.getElementById("studentID").disabled = true;
@@ -126,28 +126,37 @@ async function submitAnswers(){
   }
 }
 
-// Auto-check submission when page loads or ID input changes
-async function autoCheck(){
+// Auto-enable Load Questions if ID not submitted
+async function autoCheckLoad(){
+  const loadBtn = document.getElementById("loadQuestionsBtn");
   const nameInput = document.getElementById("studentName");
   const idInput = document.getElementById("studentID");
+  const resultMsg = document.getElementById("result");
 
-  // Check whenever ID or Name changes
-  idInput.addEventListener("change", async ()=>{
+  async function checkEnable(){
     const name = nameInput.value.trim();
     const id = idInput.value.trim();
-    if(id){
-      const submitted = await checkSubmission(id,name);
-      if(submitted){
-        document.getElementById("result").innerText = "You have already submitted.";
-        disableAllInputs();
-      }
+    if(!id) { loadBtn.disabled=true; resultMsg.innerText=""; return; }
+    const submitted = await checkSubmission(id,name);
+    if(submitted){
+      loadBtn.disabled=true;
+      resultMsg.innerText="You have already submitted.";
+    } else {
+      loadBtn.disabled=false;
+      resultMsg.innerText="";
     }
-  });
+  }
+
+  nameInput.addEventListener("input", checkEnable);
+  idInput.addEventListener("input", checkEnable);
+
+  // Check on page load too
+  checkEnable();
 }
 
 window.onload = () => {
   loadPdfLink();
-  autoCheck();
+  autoCheckLoad();
 };
 </script>
 </body>
