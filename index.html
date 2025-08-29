@@ -32,34 +32,34 @@ button:disabled { opacity:0.6; cursor:not-allowed; }
 <p id="result"></p>
 
 <script>
-const WEBAPP_URL="https://script.google.com/macros/s/AKfycby3a9r-GHJubR7ffeToZ3bQ7WtfJNskdJXdwYMmNoIzL4J8N3y3-YYM0Z-xKAdjU9t-/exec"; 
+const WEBAPP_URL="https://script.google.com/macros/s/AKfycbwnqP3tJKoDr_qGwKQvfp4tjydGXsVM4_odVR47LOxeQS7esGkxLkshY8FzWS7vJaljWA/exec";
 let questionData=[];
 
 // Load PDF link
 async function loadPdfLink(){
   try{
-    const res=await fetch(`${WEBAPP_URL}?action=getPdfLink`);
-    const data=await res.json();
-    const pdfContainer=document.getElementById("pdfLink");
-    if(data.link) pdfContainer.innerHTML=`<a href="${data.link}" target="_blank">Click here to open Question Exam</a>`;
-    else pdfContainer.innerText="No PDF link available.";
+    const res = await fetch(`${WEBAPP_URL}?action=getPdfLink`);
+    const data = await res.json();
+    const pdfContainer = document.getElementById("pdfLink");
+    if(data.link) pdfContainer.innerHTML = `<a href="${data.link}" target="_blank">Click here to open Question Exam</a>`;
+    else pdfContainer.innerText = "No PDF link available.";
   }catch(err){document.getElementById("pdfLink").innerText="Failed to load PDF link: "+err;}
 }
 
-// Check ID submission
-async function checkSubmission(id, name){
+// Check submission status
+async function checkSubmission(id){
   if(!id) return false;
   try{
-    const res = await fetch(`${WEBAPP_URL}?action=checkAnswersAndSave&name=${encodeURIComponent(name||"")}&id=${encodeURIComponent(id)}&answers=${encodeURIComponent(JSON.stringify([]))}`);
+    const res = await fetch(`${WEBAPP_URL}?action=checkSubmissionStatus&id=${encodeURIComponent(id)}`);
     const data = await res.json();
-    return data.status==="error" && data.message.includes("already submitted");
+    return data.submitted;
   }catch(err){
     console.error("Error checking submission:", err);
     return false;
   }
 }
 
-// Load Questions
+// Load questions
 async function loadQuestions(){
   const name = document.getElementById("studentName").value.trim();
   const id = document.getElementById("studentID").value.trim();
@@ -68,7 +68,7 @@ async function loadQuestions(){
 
   if(!name || !id){alert("Enter name & ID"); return;}
 
-  const alreadySubmitted = await checkSubmission(id,name);
+  const alreadySubmitted = await checkSubmission(id);
   if(alreadySubmitted){
     msg.innerText = "You have already submitted.";
     disableAllInputs();
@@ -76,38 +76,26 @@ async function loadQuestions(){
   }
 
   try{
-    const res=await fetch(`${WEBAPP_URL}?action=getQuestions`);
-    questionData=await res.json();
-    const container=document.getElementById("questions");
-    container.innerHTML="";
+    const res = await fetch(`${WEBAPP_URL}?action=getQuestions`);
+    questionData = await res.json();
+    const container = document.getElementById("questions");
+    container.innerHTML = "";
     questionData.forEach((q,i)=>{
-      const div=document.createElement("div");
-      div.className="question-row";
-      div.innerHTML=`<p>${i+1}. ${q.question} (Max: ${q.maxMark})</p>
-                     <input type="text" id="ans${i}" placeholder="Your answer">`;
+      const div = document.createElement("div");
+      div.className = "question-row";
+      div.innerHTML = `<p>${i+1}. ${q.question} (Max: ${q.maxMark})</p>
+                       <input type="text" id="ans${i}" placeholder="Your answer">`;
       container.appendChild(div);
     });
     document.getElementById("submitBtn").disabled=false;
   }catch(err){document.getElementById("questions").innerText="Failed to load questions: "+err;}
 }
 
-// Disable all inputs
-function disableAllInputs(){
-  document.getElementById("studentName").disabled = true;
-  document.getElementById("studentID").disabled = true;
-  document.getElementById("submitBtn").disabled = true;
-  document.getElementById("loadQuestionsBtn").disabled = true;
-  questionData.forEach((_,i)=>{
-    const input=document.getElementById(`ans${i}`);
-    if(input) input.disabled = true;
-  });
-}
-
-// Submit Answers
+// Submit answers
 async function submitAnswers(){
   const name = document.getElementById("studentName").value.trim();
   const id = document.getElementById("studentID").value.trim();
-  const answers = questionData.map((_, i) => document.getElementById(`ans${i}`).value);
+  const answers = questionData.map((_,i)=>document.getElementById(`ans${i}`).value);
   const msg = document.getElementById("result");
 
   const url = `${WEBAPP_URL}?action=checkAnswersAndSave&name=${encodeURIComponent(name)}&id=${encodeURIComponent(id)}&answers=${encodeURIComponent(JSON.stringify(answers))}`;
@@ -122,12 +110,24 @@ async function submitAnswers(){
       msg.innerText = data.message;
     }
   } catch(err){
-    alert("Error submitting answers: " + err);
+    alert("Error submitting answers: "+err);
   }
 }
 
-// Auto-enable Load Questions if ID not submitted
-async function autoCheckLoad(){
+// Disable all inputs
+function disableAllInputs(){
+  document.getElementById("studentName").disabled=true;
+  document.getElementById("studentID").disabled=true;
+  document.getElementById("loadQuestionsBtn").disabled=true;
+  document.getElementById("submitBtn").disabled=true;
+  questionData.forEach((_,i)=>{
+    const input = document.getElementById(`ans${i}`);
+    if(input) input.disabled = true;
+  });
+}
+
+// Auto-enable / disable Load Questions on page load or ID input
+function autoCheckLoad(){
   const loadBtn = document.getElementById("loadQuestionsBtn");
   const nameInput = document.getElementById("studentName");
   const idInput = document.getElementById("studentID");
@@ -137,7 +137,7 @@ async function autoCheckLoad(){
     const name = nameInput.value.trim();
     const id = idInput.value.trim();
     if(!id) { loadBtn.disabled=true; resultMsg.innerText=""; return; }
-    const submitted = await checkSubmission(id,name);
+    const submitted = await checkSubmission(id);
     if(submitted){
       loadBtn.disabled=true;
       resultMsg.innerText="You have already submitted.";
@@ -150,8 +150,7 @@ async function autoCheckLoad(){
   nameInput.addEventListener("input", checkEnable);
   idInput.addEventListener("input", checkEnable);
 
-  // Check on page load too
-  checkEnable();
+  checkEnable(); // initial check on load
 }
 
 window.onload = () => {
