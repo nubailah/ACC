@@ -32,7 +32,7 @@ button:disabled { opacity:0.6; cursor:not-allowed; }
 <p id="result"></p>
 
 <script>
-const WEBAPP_URL="https://script.google.com/macros/s/AKfycbxV5KIk0XGKxi-eG_SLIwjnsb366s_9XHOVyrwdxo7SPQbN3cE9_J4hWRvX-fCe5W1HNQ/exec";
+const WEBAPP_URL="https://script.google.com/macros/s/AKfycbz1E9b-QMxQ35q0z71oX8IUWB1Tlrdb7J9lAxFmSgNWPZzsrtq8ftSN1hFTORGPV5gHNg/exec";
 let questionData=[];
 
 // -----------------------------
@@ -48,6 +48,19 @@ async function checkSubmission(id){
 }
 
 // -----------------------------
+// Check if exam is active
+// -----------------------------
+async function isExamActive(){
+  try{
+    const res = await fetch(`${WEBAPP_URL}?action=getExamTime`);
+    const data = await res.json();
+    if(!data.start || !data.end) return false;
+    const now = new Date().getTime();
+    return now >= data.start && now <= data.end;
+  } catch(err){ console.error(err); return false; }
+}
+
+// -----------------------------
 // Load PDF link
 // -----------------------------
 async function loadPdfLink(){
@@ -55,17 +68,9 @@ async function loadPdfLink(){
     const res = await fetch(`${WEBAPP_URL}?action=getPdfLink`);
     const data = await res.json();
     const pdfContainer = document.getElementById("pdfLink");
-    if(data.link){
-      pdfContainer.innerHTML = `<a href="${data.link}" target="_blank">Click here to open Question Exam</a>`;
-      document.getElementById("loadQuestionsBtn").disabled = false;
-    } else {
-      pdfContainer.innerText = "Exam not active now. PDF link disabled.";
-      document.getElementById("loadQuestionsBtn").disabled = true;
-      document.getElementById("submitBtn").disabled = true;
-    }
-  }catch(err){
-    document.getElementById("pdfLink").innerText="Failed to load PDF link: "+err;
-  }
+    if(data.link) pdfContainer.innerHTML = `<a href="${data.link}" target="_blank">Click here to open Question Exam</a>`;
+    else pdfContainer.innerText = "No PDF link available.";
+  }catch(err){document.getElementById("pdfLink").innerText="Failed to load PDF link: "+err;}
 }
 
 // -----------------------------
@@ -79,20 +84,16 @@ async function loadQuestions(){
 
   if(!name || !id){ alert("Enter name & ID"); return; }
 
+  const active = await isExamActive();
+  if(!active){ msg.innerText="Exam not active now."; return; }
+
   const alreadySubmitted = await checkSubmission(id);
-  if(alreadySubmitted){
-    msg.innerText = "You have already submitted.";
-    disableAllInputs();
-    return;
-  }
+  if(alreadySubmitted){ msg.innerText = "You have already submitted."; disableAllInputs(); return; }
 
   try{
     const res = await fetch(`${WEBAPP_URL}?action=getQuestions`);
     questionData = await res.json();
-    if(questionData.length===0){
-      msg.innerText = "Exam not active now. Questions cannot be loaded.";
-      return;
-    }
+    if(questionData.length===0){ msg.innerText="Exam not active now."; return; }
 
     const container = document.getElementById("questions");
     container.innerHTML = "";
@@ -104,9 +105,7 @@ async function loadQuestions(){
       container.appendChild(div);
     });
     document.getElementById("submitBtn").disabled=false;
-  }catch(err){
-    document.getElementById("questions").innerText="Failed to load questions: "+err;
-  }
+  }catch(err){ msg.innerText="Failed to load questions: "+err; }
 }
 
 // -----------------------------
@@ -123,12 +122,8 @@ async function submitAnswers(){
     const res = await fetch(url);
     const data = await res.json();
     alert(data.message);
-    if(data.status==="success"){
-      msg.innerText = "Submission successful!";
-      disableAllInputs();
-    } else {
-      msg.innerText = data.message;
-    }
+    if(data.status==="success"){ msg.innerText="Submission successful!"; disableAllInputs(); }
+    else msg.innerText = data.message;
   } catch(err){ alert("Error submitting answers: "+err); }
 }
 
@@ -160,19 +155,15 @@ function autoCheckLoad(){
     const id = idInput.value.trim();
     if(!id) { loadBtn.disabled=true; resultMsg.innerText=""; return; }
 
+    const active = await isExamActive();
     const submitted = await checkSubmission(id);
-    if(submitted){
-      loadBtn.disabled=true;
-      resultMsg.innerText="You have already submitted.";
-    } else {
-      loadBtn.disabled=false;
-      resultMsg.innerText="";
-    }
+    if(!active){ loadBtn.disabled=true; resultMsg.innerText="Exam not active now."; return; }
+    if(submitted){ loadBtn.disabled=true; resultMsg.innerText="You have already submitted."; return; }
+    loadBtn.disabled=false; resultMsg.innerText="";
   }
 
   nameInput.addEventListener("input", checkEnable);
   idInput.addEventListener("input", checkEnable);
-
   checkEnable(); // initial check
 }
 
