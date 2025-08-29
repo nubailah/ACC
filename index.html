@@ -1,111 +1,98 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>ACCOUNTING EXAM FOR CFAB TRIAL</title>
-<style>
-body { font-family: Arial; max-width:800px; margin:auto; padding:20px; }
-h1 { text-align:center; }
-#pdfLink { text-align:center; margin-bottom:20px; }
-.student-info { display:flex; gap:10px; justify-content:center; margin-bottom:20px; flex-wrap:wrap; }
-#questions { display:flex; flex-direction:column; gap:10px; margin-bottom:20px; }
-.question-row { display:flex; justify-content:space-between; background:#f9f9f9; padding:10px; border-radius:5px; }
-.question-row p { margin:0; width:60%; }
-.question-row input { width:35%; padding:5px; }
-button { padding:10px 20px; font-size:16px; cursor:pointer; }
-button:disabled { opacity:0.6; cursor:not-allowed; }
-#result { text-align:center; font-weight:bold; margin-top:15px; }
-</style>
+  <title>Exam System</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    input, button { margin: 5px; padding: 8px; }
+    iframe { border:1px solid #ccc; border-radius:8px; }
+  </style>
 </head>
 <body>
-<h1>ACCOUNTING EXAM FOR CFAB TRIALS</h1>
-<div id="pdfLink">Loading PDF link...</div>
+  <h2>Exam System</h2>
 
-<div class="student-info">
-<input type="text" id="studentName" placeholder="Your Name">
-<input type="text" id="studentID" placeholder="Student ID">
-<button id="loadQuestionsBtn" onclick="loadQuestions()">Load Questions</button>
-<button id="submitBtn" onclick="submitAnswers()" disabled>Submit Answers</button>
-</div>
+  <label>Student Name:</label>
+  <input type="text" id="studentName"><br>
 
-<div id="questions"></div>
-<p id="result"></p>
+  <label>Student ID:</label>
+  <input type="text" id="studentID"><br>
 
-<script>
-const WEBAPP_URL="https://script.google.com/macros/s/AKfycbxtMVp-l9bDE_Wa3za8zlsPtGFYESd11PKzauJ8jOarHW5Hr4vnGS70tVayH4_HUIYnFQ/exec"; 
-let questionData=[];
+  <button onclick="loadQuestions()">Load Questions</button>
+  <div id="questions"></div>
 
-async function loadPdfLink(){
-  try{
-    const res = await fetch(`${WEBAPP_URL}?action=getPdfLink`);
-    const data = await res.json();
-    const pdfContainer = document.getElementById("pdfLink");
+  <button onclick="submitAnswers()">Submit Answers</button>
+  <p id="result"></p>
 
-    if(data.link){
-      // terus embed PDF
-      pdfContainer.innerHTML = `
-        <iframe src="${data.link}" width="100%" height="600px" 
-                style="border:1px solid #ccc; border-radius:8px;"></iframe>`;
-    } else {
-      pdfContainer.innerText = "No PDF link available.";
+  <h3>Exam Paper</h3>
+  <div id="pdfContainer"></div>
+
+  <script>
+    const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbynywD9M-OLdVubQA7CfGV66pIaz0LIFFBxMNNVcVX1_10TGdcHLpMUV5QKsFbTzCjKDA/exec"; // <-- letak link deploy Apps Script
+
+    // Load Questions
+    async function loadQuestions(){
+      try {
+        const res = await fetch(`${WEBAPP_URL}?action=getQuestions`);
+        const data = await res.json();
+        const container = document.getElementById("questions");
+        container.innerHTML = "";
+        if(data.length === 0){
+          container.innerHTML = "<p>No questions found.</p>";
+          return;
+        }
+        data.forEach((q, i) => {
+          const div = document.createElement("div");
+          div.innerHTML = `<p>${i+1}. ${q.text} (Max: ${q.marks})</p>
+                           <input type="text" id="ans${i}" placeholder="Your answer">`;
+          container.appendChild(div);
+        });
+      } catch(err){
+        console.error("Error loading questions:", err);
+        alert("Failed to load questions.");
+      }
     }
-  } catch(err){
-    document.getElementById("pdfLink").innerText = "Failed to load PDF link: " + err;
-  }
-}
 
+    // Submit Answers
+    async function submitAnswers(){
+      const name = document.getElementById("studentName").value.trim();
+      const id = document.getElementById("studentID").value.trim();
+      const answers = Array.from(document.querySelectorAll("#questions input")).map(inp => inp.value);
 
-async function loadQuestions(){
-  const name=document.getElementById("studentName").value.trim();
-  const id=document.getElementById("studentID").value.trim();
-  if(!name || !id){alert("Enter name & ID"); return;}
-  try{
-    const res=await fetch(`${WEBAPP_URL}?action=getQuestions`);
-    questionData=await res.json();
-    const container=document.getElementById("questions");
-    container.innerHTML="";
-    questionData.forEach((q,i)=>{
-      const div=document.createElement("div");
-      div.className="question-row";
-      div.innerHTML=`<p>${i+1}. ${q.question} (Max: ${q.maxMark})</p>
-                     <input type="text" id="ans${i}" placeholder="Your answer">`;
-      container.appendChild(div);
-    });
-    document.getElementById("submitBtn").disabled=false;
-  }catch(err){document.getElementById("questions").innerText="Failed to load questions: "+err;}
-}
+      try {
+        const res = await fetch(`${WEBAPP_URL}?action=checkAnswersAndSave&name=${encodeURIComponent(name)}&id=${encodeURIComponent(id)}&answers=${encodeURIComponent(JSON.stringify(answers))}`);
+        const data = await res.json();
+        document.getElementById("result").innerText = `You scored: ${data.total} marks.`;
 
+        // disable inputs after submit
+        document.querySelectorAll("#questions input").forEach(inp => inp.disabled = true);
+      } catch(err){
+        console.error("Error submitting answers:", err);
+        alert("Failed to submit answers.");
+      }
+    }
 
-async function submitAnswers(){
-  const name = document.getElementById("studentName").value.trim();
-  const id = document.getElementById("studentID").value.trim();
-  const answers = questionData.map((_, i) => document.getElementById(`ans${i}`).value);
+    // Load PDF from Apps Script
+    async function loadPdfLink(){
+      try {
+        const res = await fetch(`${WEBAPP_URL}?action=getPdfLink`);
+        const data = await res.json();
+        const pdfContainer = document.getElementById("pdfContainer");
 
-  const url = `${WEBAPP_URL}?action=checkAnswersAndSave&name=${encodeURIComponent(name)}&id=${encodeURIComponent(id)}&answers=${encodeURIComponent(JSON.stringify(answers))}`;
+        if(data.link){
+          pdfContainer.innerHTML = `
+            <iframe src="https://docs.google.com/viewer?url=${encodeURIComponent(data.link)}&embedded=true" 
+                    width="100%" height="600px"></iframe>`;
+        } else {
+          pdfContainer.innerHTML = "<p>No PDF link found.</p>";
+        }
+      } catch(err){
+        console.error("Error loading PDF:", err);
+        alert("Failed to load PDF.");
+      }
+    }
 
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-
-    // 🔹 Papar popup
-    alert(data.message);
-
-    // 🔹 Disable semua input selepas submit
-    document.getElementById("studentName").disabled = true;
-    document.getElementById("studentID").disabled = true;
-    questionData.forEach((_, i) => {
-      document.getElementById(`ans${i}`).disabled = true;
-    });
-    document.getElementById("submitBtn").disabled = true; // kalau ada butang submit
-  } catch (err) {
-    alert("Error submitting answers: " + err);
-  }
-}
-
-
-
-window.onload=loadPdfLink;
-</script>
-
+    // Auto-load PDF when page open
+    loadPdfLink();
+  </script>
 </body>
 </html>
