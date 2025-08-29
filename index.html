@@ -126,7 +126,10 @@
 <body>
 
 <header>
-  <img src="https://drive.google.com/uc?export=view&id=1Y2jiQGkxfKDdSGaRABAzccY0OekXZ6yL" alt="Logo">
+  <!-- Direct Google Drive link, public -->
+  <img src="https://drive.google.com/uc?export=view&id=1Y2jiQGkxfKDdSGaRABAzccY0OekXZ6yL" 
+       alt="Logo" 
+       onerror="this.style.display='none'">
   <h1>ACCOUNTING EXAM FOR CFAB</h1>
 </header>
 
@@ -181,7 +184,7 @@ async function isExamActive(){
 
 async function loadPdf(){
   const pdfContainer = document.getElementById("pdfContainer");
-  pdfContainer.innerHTML = `<div class="spinner"></div>Loading PDF...`;
+  pdfContainer.innerHTML = `<div class="spinner"></div>Loading Exam Questions...`;
 
   try{
     const res = await fetch(`${WEBAPP_URL}?action=getPdfLink`);
@@ -194,7 +197,7 @@ async function loadPdf(){
       pdfContainer.innerText = "Exam PDF not available or exam not active.";
     }
   } catch(err){
-    pdfContainer.innerText = "Failed to load PDF: " + err;
+    pdfContainer.innerText = "Failed to load exam: " + err;
   }
 }
 
