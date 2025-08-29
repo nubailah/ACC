@@ -37,13 +37,23 @@ let questionData=[];
 
 async function loadPdfLink(){
   try{
-    const res=await fetch(`${WEBAPP_URL}?action=getPdfLink`);
-    const data=await res.json();
-    const pdfContainer=document.getElementById("pdfLink");
-    if(data.link) pdfContainer.innerHTML=`<a href="${data.link}" target="_blank">Click here to open Question Exam</a>`;
-    else pdfContainer.innerText="No PDF link available.";
-  }catch(err){document.getElementById("pdfLink").innerText="Failed to load PDF link: "+err;}
+    const res = await fetch(`${WEBAPP_URL}?action=getPdfLink`);
+    const data = await res.json();
+    const pdfContainer = document.getElementById("pdfLink");
+
+    if(data.link){
+      // terus embed PDF
+      pdfContainer.innerHTML = `
+        <iframe src="${data.link}" width="100%" height="600px" 
+                style="border:1px solid #ccc; border-radius:8px;"></iframe>`;
+    } else {
+      pdfContainer.innerText = "No PDF link available.";
+    }
+  } catch(err){
+    document.getElementById("pdfLink").innerText = "Failed to load PDF link: " + err;
+  }
 }
+
 
 async function loadQuestions(){
   const name=document.getElementById("studentName").value.trim();
