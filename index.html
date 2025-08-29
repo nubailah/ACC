@@ -15,12 +15,10 @@ h1 { text-align:center; }
 button { padding:10px 20px; font-size:16px; cursor:pointer; }
 button:disabled { opacity:0.6; cursor:not-allowed; }
 #result { text-align:center; font-weight:bold; margin-top:15px; color:red; }
-#countdown { text-align:center; font-weight:bold; margin-bottom:10px; color:blue; }
 </style>
 </head>
 <body>
 <h1>ACCOUNTING EXAM FOR CFAB</h1>
-<div id="countdown"></div>
 <div id="pdfLink">Loading PDF link...</div>
 
 <div class="student-info">
@@ -38,7 +36,7 @@ const WEBAPP_URL="https://script.google.com/macros/s/AKfycbxV5KIk0XGKxi-eG_SLIwj
 let questionData=[];
 
 // -----------------------------
-// Helper: check submission status
+// Check submission status
 // -----------------------------
 async function checkSubmission(id){
   if(!id) return false;
@@ -46,7 +44,7 @@ async function checkSubmission(id){
     const res = await fetch(`${WEBAPP_URL}?action=checkSubmissionStatus&id=${encodeURIComponent(id)}`);
     const data = await res.json();
     return data.submitted;
-  }catch(err){ console.error("Error checking submission:", err); return false; }
+  }catch(err){ console.error(err); return false; }
 }
 
 // -----------------------------
@@ -179,36 +177,11 @@ function autoCheckLoad(){
 }
 
 // -----------------------------
-// Countdown timer
-// -----------------------------
-async function updateCountdown(){
-  try{
-    const res = await fetch(`${WEBAPP_URL}?action=getPdfLink`);
-    const data = await res.json();
-    const countdown = document.getElementById("countdown");
-    if(data.link){
-      countdown.innerText = "Exam is active now!";
-    } else {
-      countdown.innerText = "Exam not active at the moment.";
-    }
-  } catch(err){ console.error(err); }
-}
-
-// -----------------------------
-// Auto refresh every 10s
-// -----------------------------
-setInterval(() => {
-  loadPdfLink();
-  updateCountdown();
-}, 10000);
-
-// -----------------------------
 // On load
 // -----------------------------
 window.onload = () => {
   loadPdfLink();
   autoCheckLoad();
-  updateCountdown();
 };
 </script>
 </body>
