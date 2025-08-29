@@ -14,17 +14,19 @@ h1 { text-align:center; }
 .question-row input { width:35%; padding:5px; }
 button { padding:10px 20px; font-size:16px; cursor:pointer; }
 button:disabled { opacity:0.6; cursor:not-allowed; }
-#result { text-align:center; font-weight:bold; margin-top:15px; }
+#result { text-align:center; font-weight:bold; margin-top:15px; color:red; }
+#countdown { text-align:center; font-weight:bold; margin-bottom:10px; color:blue; }
 </style>
 </head>
 <body>
 <h1>ACCOUNTING EXAM FOR CFAB</h1>
-<div id="pdfLink">Loading qUETION EXAM</div>
+<div id="countdown"></div>
+<div id="pdfLink">Loading PDF link...</div>
 
 <div class="student-info">
 <input type="text" id="studentName" placeholder="Your Name">
 <input type="text" id="studentID" placeholder="Student ID">
-<button id="loadQuestionsBtn" onclick="loadQuestions()">Load Questions</button>
+<button id="loadQuestionsBtn" onclick="loadQuestions()" disabled>Load Questions</button>
 <button id="submitBtn" onclick="submitAnswers()" disabled>Submit Answers</button>
 </div>
 
@@ -32,10 +34,24 @@ button:disabled { opacity:0.6; cursor:not-allowed; }
 <p id="result"></p>
 
 <script>
-const WEBAPP_URL="https://script.google.com/macros/s/AKfycbzmENmihQn1sphS9dUHfEN_1isB7Coo69r7l4xqol_ECWTFAkMG4LwMRIXgw9cos0YJ2A/exec";
+const WEBAPP_URL="https://script.google.com/macros/s/AKfycbxV5KIk0XGKxi-eG_SLIwjnsb366s_9XHOVyrwdxo7SPQbN3cE9_J4hWRvX-fCe5W1HNQ/exec";
 let questionData=[];
 
-// load PDF link
+// -----------------------------
+// Helper: check submission status
+// -----------------------------
+async function checkSubmission(id){
+  if(!id) return false;
+  try{
+    const res = await fetch(`${WEBAPP_URL}?action=checkSubmissionStatus&id=${encodeURIComponent(id)}`);
+    const data = await res.json();
+    return data.submitted;
+  }catch(err){ console.error("Error checking submission:", err); return false; }
+}
+
+// -----------------------------
+// Load PDF link
+// -----------------------------
 async function loadPdfLink(){
   try{
     const res = await fetch(`${WEBAPP_URL}?action=getPdfLink`);
@@ -43,80 +59,157 @@ async function loadPdfLink(){
     const pdfContainer = document.getElementById("pdfLink");
     if(data.link){
       pdfContainer.innerHTML = `<a href="${data.link}" target="_blank">Click here to open Question Exam</a>`;
+      document.getElementById("loadQuestionsBtn").disabled = false;
     } else {
-      pdfContainer.innerText = data.message || "No PDF link available.";
-      document.getElementById("loadQuestionsBtn").disabled=true;
+      pdfContainer.innerText = "Exam not active now. PDF link disabled.";
+      document.getElementById("loadQuestionsBtn").disabled = true;
+      document.getElementById("submitBtn").disabled = true;
     }
-  } catch(err){ document.getElementById("pdfLink").innerText="Failed to load PDF link: "+err; }
+  }catch(err){
+    document.getElementById("pdfLink").innerText="Failed to load PDF link: "+err;
+  }
 }
 
-// periksa sama ada ID sudah submit
-async function checkSubmission(id){
-  try{
-    const res = await fetch(`${WEBAPP_URL}?action=checkSubmissionStatus&id=${encodeURIComponent(id)}`);
-    const data = await res.json();
-    return data===true;
-  }catch(err){ return false; }
-}
-
-// load questions
+// -----------------------------
+// Load questions
+// -----------------------------
 async function loadQuestions(){
   const name = document.getElementById("studentName").value.trim();
-  const id   = document.getElementById("studentID").value.trim();
-  const msg  = document.getElementById("result");
+  const id = document.getElementById("studentID").value.trim();
+  const msg = document.getElementById("result");
   msg.innerText="";
 
   if(!name || !id){ alert("Enter name & ID"); return; }
 
   const alreadySubmitted = await checkSubmission(id);
-  if(alreadySubmitted){ msg.innerText="You have already submitted."; disableAllInputs(); return; }
+  if(alreadySubmitted){
+    msg.innerText = "You have already submitted.";
+    disableAllInputs();
+    return;
+  }
 
   try{
     const res = await fetch(`${WEBAPP_URL}?action=getQuestions`);
-    const data = await res.json();
-    if(!data.questions || data.questions.length===0){ msg.innerText=data.message||"Exam not open."; return; }
+    questionData = await res.json();
+    if(questionData.length===0){
+      msg.innerText = "Exam not active now. Questions cannot be loaded.";
+      return;
+    }
 
-    questionData = data.questions;
     const container = document.getElementById("questions");
-    container.innerHTML="";
+    container.innerHTML = "";
     questionData.forEach((q,i)=>{
       const div = document.createElement("div");
-      div.className="question-row";
+      div.className = "question-row";
       div.innerHTML = `<p>${i+1}. ${q.question} (Max: ${q.maxMark})</p>
                        <input type="text" id="ans${i}" placeholder="Your answer">`;
       container.appendChild(div);
     });
     document.getElementById("submitBtn").disabled=false;
-  }catch(err){ msg.innerText="Failed to load questions: "+err; }
+  }catch(err){
+    document.getElementById("questions").innerText="Failed to load questions: "+err;
+  }
 }
 
-// submit answers
+// -----------------------------
+// Submit answers
+// -----------------------------
 async function submitAnswers(){
   const name = document.getElementById("studentName").value.trim();
-  const id   = document.getElementById("studentID").value.trim();
+  const id = document.getElementById("studentID").value.trim();
   const answers = questionData.map((_,i)=>document.getElementById(`ans${i}`).value);
+  const msg = document.getElementById("result");
 
   const url = `${WEBAPP_URL}?action=checkAnswersAndSave&name=${encodeURIComponent(name)}&id=${encodeURIComponent(id)}&answers=${encodeURIComponent(JSON.stringify(answers))}`;
-
   try{
     const res = await fetch(url);
     const data = await res.json();
     alert(data.message);
-    disableAllInputs();
-  }catch(err){ alert("Error submitting answers: "+err); }
+    if(data.status==="success"){
+      msg.innerText = "Submission successful!";
+      disableAllInputs();
+    } else {
+      msg.innerText = data.message;
+    }
+  } catch(err){ alert("Error submitting answers: "+err); }
 }
 
-// disable semua input
+// -----------------------------
+// Disable all inputs
+// -----------------------------
 function disableAllInputs(){
   document.getElementById("studentName").disabled=true;
   document.getElementById("studentID").disabled=true;
-  questionData.forEach((_,i)=>document.getElementById(`ans${i}`)?.setAttribute("disabled",true));
+  document.getElementById("loadQuestionsBtn").disabled=true;
   document.getElementById("submitBtn").disabled=true;
+  questionData.forEach((_,i)=>{
+    const input = document.getElementById(`ans${i}`);
+    if(input) input.disabled = true;
+  });
 }
 
-// load PDF on page load
-window.onload = loadPdfLink;
-</script>
+// -----------------------------
+// Auto enable / disable Load Questions
+// -----------------------------
+function autoCheckLoad(){
+  const loadBtn = document.getElementById("loadQuestionsBtn");
+  const nameInput = document.getElementById("studentName");
+  const idInput = document.getElementById("studentID");
+  const resultMsg = document.getElementById("result");
 
+  async function checkEnable(){
+    const name = nameInput.value.trim();
+    const id = idInput.value.trim();
+    if(!id) { loadBtn.disabled=true; resultMsg.innerText=""; return; }
+
+    const submitted = await checkSubmission(id);
+    if(submitted){
+      loadBtn.disabled=true;
+      resultMsg.innerText="You have already submitted.";
+    } else {
+      loadBtn.disabled=false;
+      resultMsg.innerText="";
+    }
+  }
+
+  nameInput.addEventListener("input", checkEnable);
+  idInput.addEventListener("input", checkEnable);
+
+  checkEnable(); // initial check
+}
+
+// -----------------------------
+// Countdown timer
+// -----------------------------
+async function updateCountdown(){
+  try{
+    const res = await fetch(`${WEBAPP_URL}?action=getPdfLink`);
+    const data = await res.json();
+    const countdown = document.getElementById("countdown");
+    if(data.link){
+      countdown.innerText = "Exam is active now!";
+    } else {
+      countdown.innerText = "Exam not active at the moment.";
+    }
+  } catch(err){ console.error(err); }
+}
+
+// -----------------------------
+// Auto refresh every 10s
+// -----------------------------
+setInterval(() => {
+  loadPdfLink();
+  updateCountdown();
+}, 10000);
+
+// -----------------------------
+// On load
+// -----------------------------
+window.onload = () => {
+  loadPdfLink();
+  autoCheckLoad();
+  updateCountdown();
+};
+</script>
 </body>
 </html>
